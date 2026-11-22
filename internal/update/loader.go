@@ -18,8 +18,9 @@ import (
 const maxDocumentBytes = 2 << 20
 
 var (
-	kbIdentifier = regexp.MustCompile(`(?i)\bKB[0-9]{4,8}\b`)
-	identifier   = regexp.MustCompile(`(?i)(?:feature(?:id)?|roadmap|update|id)[/_=-](\d{4,10})`)
+	kbIdentifier      = regexp.MustCompile(`(?i)\bKB[0-9]{4,8}\b`)
+	identifier        = regexp.MustCompile(`(?i)(?:feature(?:id)?|roadmap|update|id)[/_=-](\d{4,10})`)
+	urlPathIdentifier = regexp.MustCompile(`(?i)/(?:feature(?:id)?|roadmap|updates?|id)[/_=-](\d{4,10})(?:$|[/_.-])`)
 )
 
 type Document struct {
@@ -46,23 +47,23 @@ func (l Loader) Load(ctx context.Context, input, file string, stdin io.Reader) (
 		if err != nil {
 			return Document{}, err
 		}
-		return newDocument(string(data), ""), nil
+		return newDocument(string(data)), nil
 	case value == "-":
 		data, err := readLimited(stdin, maxDocumentBytes)
 		if err != nil {
 			return Document{}, fmt.Errorf("read update from stdin: %w", err)
 		}
-		return newDocument(string(data), ""), nil
+		return newDocument(string(data)), nil
 	case strings.HasPrefix(value, "@"):
 		data, err := readFile(strings.TrimSpace(strings.TrimPrefix(value, "@")))
 		if err != nil {
 			return Document{}, err
 		}
-		return newDocument(string(data), ""), nil
+		return newDocument(string(data)), nil
 	case isURL(value):
 		return l.loadURL(ctx, value)
 	default:
-		return newDocument(value, ""), nil
+		return newDocument(value), nil
 	}
 }
 
@@ -127,16 +128,23 @@ func (l Loader) loadURL(ctx context.Context, rawURL string) (Document, error) {
 	} else {
 		return Document{}, fmt.Errorf("fetch update: unsupported content type %q", contentType)
 	}
-	return newDocumentWithTitle(body, response.Request.URL.String(), title), nil
+	finalURL := response.Request.URL
+	id := findURLIdentifier(finalURL)
+	if id == "" {
+		id = findURLIdentifier(parsed)
+	}
+	return newDocumentWithTitle(body, finalURL.String(), title, id), nil
 }
 
-func newDocument(raw, rawURL string) Document {
-	return newDocumentWithTitle(raw, rawURL, "")
+func newDocument(raw string) Document {
+	return newDocumentWithTitle(raw, "", "", "")
 }
 
-func newDocumentWithTitle(raw, rawURL, title string) Document {
+func newDocumentWithTitle(raw, rawURL, title, id string) Document {
 	text := normalize(raw)
-	id := findIdentifier(text + " " + rawURL)
+	if id == "" {
+		id = findIdentifier(text)
+	}
 	query := deriveQuery(title, text, rawURL, id)
 	return Document{
 		Title:      strings.TrimSpace(title),
@@ -189,19 +197,43 @@ func findIdentifier(text string) string {
 		return matches[1]
 	}
 	trimmed := strings.TrimSpace(text)
-	if len(trimmed) >= 4 && len(trimmed) <= 10 && isDigits(trimmed) {
+	if isNumericIdentifier(trimmed) {
 		return trimmed
 	}
 	return ""
 }
 
-func isDigits(value string) bool {
+func findURLIdentifier(location *url.URL) string {
+	if value := kbIdentifier.FindString(location.Path); value != "" {
+		return strings.ToUpper(value)
+	}
+	if matches := urlPathIdentifier.FindStringSubmatch(location.Path); len(matches) == 2 {
+		return matches[1]
+	}
+	query := location.Query()
+	for _, key := range []string{"id", "featureId", "featureid", "feature", "roadmap", "update"} {
+		for _, value := range query[key] {
+			if isNumericIdentifier(value) {
+				return value
+			}
+			if kb := kbIdentifier.FindString(value); kb != "" && kb == value {
+				return strings.ToUpper(kb)
+			}
+		}
+	}
+	return ""
+}
+
+func isNumericIdentifier(value string) bool {
+	if len(value) < 4 || len(value) > 10 {
+		return false
+	}
 	for _, r := range value {
 		if r < '0' || r > '9' {
 			return false
 		}
 	}
-	return value != ""
+	return true
 }
 
 func validateMicrosoftURL(parsed *url.URL) error {

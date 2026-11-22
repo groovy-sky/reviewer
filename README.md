@@ -141,6 +141,10 @@ Remote MCP and update URLs must use HTTPS. Plain HTTP is accepted only for
 loopback endpoints so tests and local MCP proxies can run safely. Direct update
 URL fetching is restricted to Microsoft-owned domains and validates redirects.
 
+For URL inputs, an explicit update ID in the final URL's path or query
+parameters takes precedence over one in the originally supplied URL. The
+reviewer only falls back to the page text if neither URL identifies the update.
+
 ## Configuration
 
 | Flag / variable | Default | Purpose |
