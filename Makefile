@@ -48,5 +48,6 @@ test:
 
 verify: test
 	go vet ./...
+	python3 -m unittest discover -s scripts -p 'test_*.py'
 	docker compose config --quiet
 	bash -n scripts/download-model.sh

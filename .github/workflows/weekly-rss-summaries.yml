@@ -1,0 +1,155 @@
+name: Weekly RSS summaries
+
+on:
+  schedule:
+    - cron: "0 23 * * 0"
+  workflow_dispatch:
+
+concurrency:
+  group: weekly-rss-summaries
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    name: Summarize and publish RSS archives
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+    permissions:
+      contents: write
+      packages: read
+    steps:
+      - name: Check out reviewer
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Get ISO week
+        id: week
+        shell: bash
+        run: |
+          week="$(date -u +%G-W%V)"
+          echo "value=$week" >> "$GITHUB_OUTPUT"
+          echo "Generating ISO week $week."
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Start summary model
+        shell: bash
+        run: |
+          docker run --detach \
+            --name reviewer-weekly-rss-model \
+            --publish 127.0.0.1:8080:8080 \
+            ghcr.io/groovy-sky/reviewer:nemotron-3-nano-4b \
+            --model /models/NVIDIA-Nemotron3-Nano-4B-Q4_K_M.gguf \
+            --alias nemotron-3-nano-4b \
+            --host 0.0.0.0 \
+            --port 8080 \
+            --ctx-size 16384
+
+          ready=false
+          for attempt in $(seq 1 120); do
+            if curl --fail --silent http://127.0.0.1:8080/health >/dev/null; then
+              ready=true
+              break
+            fi
+            sleep 5
+          done
+          if [[ "$ready" != true ]]; then
+            docker logs reviewer-weekly-rss-model
+            exit 1
+          fi
+
+      - name: Fetch RSS archive branches
+        shell: bash
+        env:
+          RSS_SOURCE: ${{ runner.temp }}/rsscollector
+        run: |
+          git clone --quiet --filter=blob:none --no-checkout \
+            https://github.com/groovy-sky/rsscollector.git "$RSS_SOURCE"
+          git -C "$RSS_SOURCE" fetch --quiet --depth=1 origin \
+            '+refs/heads/rss*:refs/remotes/origin/rss*'
+
+      - name: Generate and publish weekly reports
+        shell: bash
+        env:
+          RSS_SOURCE: ${{ runner.temp }}/rsscollector
+          WEEK: ${{ steps.week.outputs.value }}
+        run: |
+          set -euo pipefail
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          report_root="$RUNNER_TEMP/weekly-rss-reports"
+          mkdir -p "$report_root"
+
+          mapfile -t source_refs < <(
+            git -C "$RSS_SOURCE" for-each-ref \
+              --format='%(refname)' \
+              refs/remotes/origin |
+              while IFS= read -r ref; do
+                if [[ "$ref" == refs/remotes/origin/rss* ]]; then
+                  printf '%s\n' "$ref"
+                fi
+              done
+          )
+          if [[ "${#source_refs[@]}" -eq 0 ]]; then
+            echo "No rss* branches found in groovy-sky/rsscollector." >&2
+            exit 1
+          fi
+
+          for source_ref in "${source_refs[@]}"; do
+            branch="${source_ref#refs/remotes/origin/}"
+            safe_branch="${branch//\//-}"
+            source_worktree="$RUNNER_TEMP/source-$safe_branch"
+            publish_worktree="$RUNNER_TEMP/publish-$safe_branch"
+            report="$report_root/$safe_branch/$WEEK.md"
+
+            echo "Processing $branch."
+            git -C "$RSS_SOURCE" worktree add --quiet --detach \
+              "$source_worktree" "$source_ref"
+            python3 scripts/generate-weekly-rss.py \
+              --source-directory "$source_worktree" \
+              --week "$WEEK" \
+              --output "$report"
+            git -C "$RSS_SOURCE" worktree remove --force "$source_worktree"
+
+            if git ls-remote --exit-code --heads origin "$branch" >/dev/null; then
+              git fetch --quiet origin "$branch:refs/remotes/origin/$branch"
+              git worktree add --quiet -B "$branch" \
+                "$publish_worktree" "refs/remotes/origin/$branch"
+            else
+              git worktree add --quiet --detach "$publish_worktree" main
+              git -C "$publish_worktree" switch --quiet --orphan "$branch"
+            fi
+
+            mkdir -p "$publish_worktree/weekly"
+            cp "$report" "$publish_worktree/weekly/$WEEK.md"
+            git -C "$publish_worktree" add "weekly/$WEEK.md"
+            if ! git -C "$publish_worktree" diff --cached --quiet; then
+              git -C "$publish_worktree" commit --quiet \
+                -m "Add $WEEK RSS summary for $branch" \
+                -m "Co-authored-by: copilot-swe-agent[bot] <198982749+Copilot@users.noreply.github.com>"
+              git -C "$publish_worktree" push origin \
+                "$branch:refs/heads/$branch"
+            else
+              echo "No report changes for $branch."
+            fi
+            git worktree remove "$publish_worktree"
+          done
+
+      - name: Stop summary model
+        if: always()
+        shell: bash
+        run: |
+          if docker container inspect reviewer-weekly-rss-model >/dev/null 2>&1; then
+            docker rm --force reviewer-weekly-rss-model
+          fi

@@ -18,6 +18,8 @@ jobs:
           cache: true
       - name: Test
         run: go test ./...
+      - name: Test weekly RSS generator
+        run: python3 -m unittest discover -s scripts -p 'test_*.py'
       - name: Vet
         run: go vet ./...
       - name: Validate Compose

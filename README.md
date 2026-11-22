@@ -170,3 +170,19 @@ This runs the Go tests and vet checks, validates Compose, and checks the model
 download script. Tests use in-process fake MCP and llama.cpp servers. The
 `Publish model images` workflow downloads and packages the large models
 separately.
+
+## Weekly RSS summaries
+
+The `Weekly RSS summaries` workflow runs at 23:00 UTC every Sunday. It uses the
+current ISO year and week, checks each `rss*` archive branch in
+`groovy-sky/rsscollector`, and selects only entries whose current revision has
+a numeric `published_at` epoch timestamp in that week. Matching provider
+enrichments take precedence over source-truncated feed text.
+
+Each selected announcement is summarized independently by the published
+Nemotron model using the neutral-source prompt in
+`scripts/generate-weekly-rss.py`. The workflow writes one
+`weekly/<YYYY-Www>.md` report to the `reviewer` branch with the same name as the
+corresponding source archive branch, preserving reports from earlier weeks.
+The workflow can also be started manually; manual runs still target the current
+UTC ISO week.
