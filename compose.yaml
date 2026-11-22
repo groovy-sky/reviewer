@@ -1,0 +1,28 @@
+services:
+  gemma:
+    image: ${LLAMA_CPP_IMAGE:-ghcr.io/ggml-org/llama.cpp:server-b7728}
+    init: true
+    command:
+      - --model
+      - /models/${GEMMA_MODEL_FILENAME:-gemma-3-4b-it-Q4_K_M.gguf}
+      - --alias
+      - ${GEMMA_MODEL_NAME:-gemma-3-4b-it}
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8080"
+      - --ctx-size
+      - ${LLAMA_CTX_SIZE:-16384}
+      - --n-gpu-layers
+      - ${LLAMA_GPU_LAYERS:-0}
+    ports:
+      - 127.0.0.1:${LLAMA_HOST_PORT:-8080}:8080
+    volumes:
+      - ${REVIEWER_MODEL_DIR:-./models}:/models:ro
+    healthcheck:
+      test: ["CMD-SHELL", "curl --fail --silent http://127.0.0.1:8080/health >/dev/null"]
+      interval: 5s
+      timeout: 3s
+      retries: 60
+      start_period: 30s
+    stop_grace_period: 15s
