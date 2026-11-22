@@ -32,9 +32,11 @@ make up
 ```
 
 `make up` downloads the checksummed
-`gemma-3-4b-it-Q4_K_M.gguf` model, then starts the pinned
-`ghcr.io/ggml-org/llama.cpp:server-b7728` image. The OpenAI-compatible llama.cpp
-endpoint is bound only to `127.0.0.1:8080`.
+`gemma-3-4b-it-Q4_K_M.gguf` model, then starts the pinned multi-platform
+llama.cpp image and waits for it to be ready. The image runs natively on Linux
+`amd64`, `arm64`, and `s390x`; Docker resolves the matching variant
+automatically. The OpenAI-compatible endpoint is bound only to
+`127.0.0.1:8080`.
 
 Check the model and both MCP connections:
 
@@ -134,8 +136,7 @@ URL fetching is restricted to Microsoft-owned domains and validates redirects.
 | `--max-evidence` | `6` | maximum evidence blocks in the prompt |
 | `REVIEWER_LLM_API_KEY` | unset | optional Bearer token |
 
-Copy `.env.example` to `.env` to customize Docker Compose. GPU users can set
-`LLAMA_GPU_LAYERS`; the default image is CPU-only.
+Copy `.env.example` to `.env` to customize Docker Compose.
 
 ## Verification
 
