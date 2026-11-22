@@ -85,6 +85,11 @@ The client discovers each server's current tool schemas at runtime, allowlists
 the configured tool names, and calls only the review-relevant search and detail
 operations. It supports JSON and SSE responses from Streamable HTTP MCP.
 
+Each enabled server gets its own call budget. To fill the `--max-evidence`
+slots in the prompt, the reviewer takes one result per server per pass.
+Servers that returned direct ID lookup results go first; ties use
+configuration order.
+
 By default, one unavailable MCP server produces a warning and the review
 continues if another server returns usable evidence. Use `--strict-mcp` to fail
 on any configured server or tool error.

@@ -47,6 +47,11 @@ type Evidence struct {
 	Text     string
 }
 
+type evidenceBatch struct {
+	items        []Evidence
+	directLookup bool
+}
+
 type Service struct {
 	Servers           []config.Server
 	HTTPClient        *http.Client
@@ -87,7 +92,7 @@ func (s Service) Gather(ctx context.Context, document update.Document) ([]Eviden
 		}
 	}
 
-	var evidence []Evidence
+	var batches []evidenceBatch
 	var failures []error
 	for _, server := range servers {
 		if !server.IsEnabled() {
@@ -124,7 +129,7 @@ func (s Service) Gather(ctx context.Context, document update.Document) ([]Eviden
 		calls := planSearchCalls(tools, document, maxCalls)
 		called := make(map[string]struct{}, len(calls))
 		callCount := 0
-		resolvedIdentifier := false
+		var batch evidenceBatch
 		byID := make(map[string]mcp.Tool)
 		for _, tool := range tools {
 			byName := strings.ToLower(tool.Name)
@@ -134,10 +139,10 @@ func (s Service) Gather(ctx context.Context, document update.Document) ([]Eviden
 		}
 
 		for _, call := range calls {
-			if len(evidence) >= maxEvidence || callCount >= maxCalls {
+			if len(batch.items) >= maxEvidence || callCount >= maxCalls {
 				break
 			}
-			if resolvedIdentifier && !call.IsIDLookup {
+			if batch.directLookup && !call.IsIDLookup {
 				continue
 			}
 			result, err := client.CallTool(ctx, call.Tool.Name, call.Arguments)
@@ -156,13 +161,13 @@ func (s Service) Gather(ctx context.Context, document update.Document) ([]Eviden
 				continue
 			}
 			if call.IsIDLookup {
-				resolvedIdentifier = true
+				batch.directLookup = true
 			}
-			evidence = append(evidence, makeEvidence(server, call.Tool.Name, text))
+			batch.items = append(batch.items, makeEvidence(server, call.Tool.Name, text))
 
 			followups := followupCalls(call.Tool, text, tools, byID, document, maxCalls-callCount)
 			for _, followup := range followups {
-				if len(evidence) >= maxEvidence || callCount >= maxCalls {
+				if len(batch.items) >= maxEvidence || callCount >= maxCalls {
 					break
 				}
 				if _, duplicate := called[followup.CallKey]; duplicate {
@@ -181,22 +186,48 @@ func (s Service) Gather(ctx context.Context, document update.Document) ([]Eviden
 				}
 				text := truncate(result.Text(), maxTextBytes)
 				if text != "" {
-					evidence = append(evidence, makeEvidence(server, followup.Tool.Name, text))
+					batch.items = append(batch.items, makeEvidence(server, followup.Tool.Name, text))
 				}
 			}
 		}
+		if len(batch.items) > 0 {
+			batches = append(batches, batch)
+		}
 	}
 
-	for index := range evidence {
-		evidence[index].ID = "S" + strconv.Itoa(index+1)
-	}
-	if len(evidence) == 0 {
+	if len(batches) == 0 {
 		if len(failures) == 0 {
 			return nil, fmt.Errorf("Microsoft MCP servers returned no review evidence")
 		}
 		return nil, fmt.Errorf("Microsoft MCP research failed: %w", errors.Join(failures...))
 	}
-	return evidence, nil
+	return selectEvidence(batches, maxEvidence), nil
+}
+
+func selectEvidence(batches []evidenceBatch, limit int) []Evidence {
+	sort.SliceStable(batches, func(i, j int) bool {
+		return batches[i].directLookup && !batches[j].directLookup
+	})
+
+	var selected []Evidence
+	for round := 0; len(selected) < limit; round++ {
+		before := len(selected)
+		for _, batch := range batches {
+			if round >= len(batch.items) {
+				continue
+			}
+			item := batch.items[round]
+			item.ID = "S" + strconv.Itoa(len(selected)+1)
+			selected = append(selected, item)
+			if len(selected) == limit {
+				return selected
+			}
+		}
+		if len(selected) == before {
+			break
+		}
+	}
+	return selected
 }
 
 func handleFailure(strict bool, warnings io.Writer, server string, err error) bool {
