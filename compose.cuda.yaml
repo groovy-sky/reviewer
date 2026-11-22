@@ -1,0 +1,12 @@
+services:
+  gemma:
+    image: ${LLAMA_CUDA_IMAGE:-ghcr.io/ggml-org/llama.cpp:server-cuda-b12627}
+    environment:
+      LLAMA_ARG_N_GPU_LAYERS: ${LLAMA_CUDA_GPU_LAYERS:-auto}
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]

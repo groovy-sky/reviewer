@@ -1,4 +1,4 @@
-.PHONY: build model up down doctor test verify
+.PHONY: build model up up-cuda down doctor test verify
 
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 
@@ -10,6 +10,9 @@ model:
 
 up: model
 	docker compose up -d --wait gemma
+
+up-cuda: model
+	docker compose -f compose.yaml -f compose.cuda.yaml up -d --wait gemma
 
 down:
 	docker compose down
@@ -23,4 +26,5 @@ test:
 verify: test
 	go vet ./...
 	docker compose config --quiet
+	docker compose -f compose.yaml -f compose.cuda.yaml config --quiet
 	bash -n scripts/download-model.sh
