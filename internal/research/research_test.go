@@ -129,6 +129,76 @@ func TestGatherFetchesDiscoveredMicrosoftLearnPage(t *testing.T) {
 	}
 }
 
+func TestGatherSelectsEvidenceAcrossServers(t *testing.T) {
+	learn := config.Server{Name: "learn", URL: "https://learn.microsoft.com/api/mcp"}
+	release := config.Server{Name: "release", URL: "https://www.microsoft.com/releasecommunications/mcp"}
+	for _, test := range []struct {
+		name       string
+		identifier string
+		wantTools  []string
+	}{
+		{
+			name:      "second server contributes before the first repeats",
+			wantTools: []string{"microsoft_docs_search", "get_recent_azure_updates", "microsoft_docs_fetch"},
+		},
+		{
+			name:       "direct lookup wins the only slot",
+			identifier: "467931",
+			wantTools:  []string{"get_azure_update_by_id"},
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			clients := map[string]*fakeClient{
+				learn.Name: {
+					server: learn,
+					tools: []mcp.Tool{
+						tool("microsoft_docs_search", "query"),
+						tool("microsoft_docs_fetch", "url"),
+					},
+					results: map[string][]mcp.ToolResult{
+						"microsoft_docs_search": {textResult(`{"url":"https://learn.microsoft.com/azure/example"}`)},
+						"microsoft_docs_fetch":  {textResult("Full documentation")},
+					},
+				},
+				release.Name: {
+					server: release,
+					tools: []mcp.Tool{
+						tool("get_recent_azure_updates", "search"),
+						tool("get_azure_update_by_id", "id"),
+					},
+					results: map[string][]mcp.ToolResult{
+						"get_recent_azure_updates": {textResult("Recent Azure changes")},
+						"get_azure_update_by_id":   {textResult(`{"id":"467931","description":"General availability"}`)},
+					},
+				},
+			}
+			service := Service{
+				Servers:     []config.Server{learn, release},
+				MaxEvidence: len(test.wantTools),
+				Factory: func(server config.Server, _ *http.Client) (MCPClient, error) {
+					return clients[server.Name], nil
+				},
+			}
+			evidence, err := service.Gather(context.Background(), update.Document{
+				Text:       "Azure update",
+				Query:      "Azure update",
+				Identifier: test.identifier,
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(evidence) != len(test.wantTools) {
+				t.Fatalf("expected %d evidence blocks, got %d", len(test.wantTools), len(evidence))
+			}
+			for i, want := range test.wantTools {
+				if evidence[i].Tool != want {
+					t.Errorf("evidence[%d] tool = %q, want %q", i, evidence[i].Tool, want)
+				}
+			}
+		})
+	}
+}
+
 func TestGatherContinuesAfterServerFailureUnlessStrict(t *testing.T) {
 	good := config.Server{Name: "good", URL: "https://learn.microsoft.com/api/mcp", Tools: []string{"search"}}
 	bad := config.Server{Name: "bad", URL: "https://www.microsoft.com/mcp"}
