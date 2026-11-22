@@ -1,0 +1,8 @@
+ARG LLAMA_CPP_IMAGE=ghcr.io/ggml-org/llama.cpp:server-b12627
+FROM ${LLAMA_CPP_IMAGE}
+
+ARG MODEL_FILENAME
+COPY models/${MODEL_FILENAME} /models/${MODEL_FILENAME}
+
+LABEL org.opencontainers.image.source="https://github.com/groovy-sky/reviewer"
+LABEL org.opencontainers.image.description="llama.cpp runtime with a bundled model for reviewer"

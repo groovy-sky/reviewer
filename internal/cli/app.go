@@ -23,7 +23,7 @@ import (
 
 const (
 	defaultLLMURL  = "http://127.0.0.1:8080"
-	defaultModel   = "gemma-3-4b-it"
+	defaultModel   = "nemotron-3-nano-4b"
 	defaultTimeout = 5 * time.Minute
 )
 

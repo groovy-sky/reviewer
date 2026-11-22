@@ -1,0 +1,88 @@
+name: Publish model images
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - Dockerfile.model
+      - scripts/download-model.sh
+      - .github/workflows/publish-models.yml
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - model: nemotron
+            tag: nemotron-3-nano-4b
+            alias: nemotron-3-nano-4b
+            filename: NVIDIA-Nemotron3-Nano-4B-Q4_K_M.gguf
+          - model: lfm25
+            tag: lfm25-2-6b
+            alias: lfm25-2-6b
+            filename: LFM2.5-2.6B-Q8_0.gguf
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download model
+        env:
+          REVIEWER_MODEL: ${{ matrix.model }}
+          REVIEWER_MODEL_FILENAME: ${{ matrix.filename }}
+        run: ./scripts/download-model.sh
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile.model
+          push: true
+          platforms: linux/amd64
+          build-args: |
+            LLAMA_CPP_IMAGE=ghcr.io/ggml-org/llama.cpp:server-b12627
+            MODEL_FILENAME=${{ matrix.filename }}
+          tags: |
+            ghcr.io/groovy-sky/reviewer:${{ matrix.tag }}
+            ghcr.io/groovy-sky/reviewer:${{ matrix.tag }}-${{ github.sha }}
+      - name: Test published model
+        run: |
+          docker run --detach \
+            --name reviewer-model \
+            --publish 127.0.0.1:8080:8080 \
+            ghcr.io/groovy-sky/reviewer:${{ matrix.tag }} \
+            --model /models/${{ matrix.filename }} \
+            --alias ${{ matrix.alias }} \
+            --host 0.0.0.0 \
+            --port 8080 \
+            --ctx-size 16384
+          for attempt in $(seq 1 120); do
+            if curl --fail --silent http://127.0.0.1:8080/health >/dev/null; then
+              exit 0
+            fi
+            sleep 5
+          done
+          docker logs reviewer-model
+          exit 1
+      - name: Generate article responses
+        run: |
+          python3 scripts/test-model.py \
+            --model "${{ matrix.alias }}" \
+            --article testdata/copilot-harness-article.txt \
+            --output "results/${{ matrix.model }}.md"
+      - name: Upload model response
+        uses: actions/upload-artifact@v4
+        with:
+          name: model-response-${{ matrix.model }}
+          path: results/${{ matrix.model }}.md

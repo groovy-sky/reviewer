@@ -4,10 +4,11 @@
 `reviewer` is a Go CLI that writes evidence-grounded Markdown reviews of Microsoft
 updates. It combines:
 
-- the local Gemma 3 4B instruct model served by the official llama.cpp Docker image;
+- a local NVIDIA Nemotron 3 Nano 4B or LiquidAI LFM2.5 2.6B model served by
+  llama.cpp;
 - Microsoft's remote Streamable HTTP MCP servers for Learn documentation and
   Release Communications;
-- a bounded source-gathering workflow that feeds evidence to Gemma without
+- a bounded source-gathering workflow that feeds evidence to the selected model without
   exposing model tool calls or fetched pages as instructions.
 
 The CLI accepts a Microsoft update URL, a KB or release identifier, pasted
@@ -17,12 +18,16 @@ update text, a file, or stdin.
 
 - Docker with Docker Compose
 - Go 1.24 or newer
-- about 2.49 GB of free space for the quantized Gemma model
-- internet access to Hugging Face and the configured Microsoft MCP endpoints
+- enough Docker storage for a model image
+- internet access to GHCR and the configured Microsoft MCP endpoints
 
-Gemma's usage terms apply to the downloaded model. The model is downloaded from
-the `ggml-org` Gemma 3 GGUF repository at a pinned revision and verified before
-the container starts.
+The selected model's usage terms apply. The model-backed images are published to
+GHCR by the `Publish model images` workflow. They contain one of:
+
+| Model | GHCR tag |
+| --- | --- |
+| NVIDIA Nemotron 3 Nano 4B, Q4_K_M | `ghcr.io/groovy-sky/reviewer:nemotron-3-nano-4b` |
+| LiquidAI LFM2.5 2.6B, Q8_0 | `ghcr.io/groovy-sky/reviewer:lfm25-2-6b` |
 
 ## Quick start
 
@@ -31,18 +36,24 @@ make build
 make up
 ```
 
-`make up` downloads the checksummed
-`gemma-3-4b-it-Q4_K_M.gguf` model, then starts the pinned multi-platform
-llama.cpp image and waits for it to be ready. The image runs natively on Linux
-`amd64`, `arm64`, and `s390x`; Docker resolves the matching variant
-automatically. The OpenAI-compatible endpoint is bound only to
-`127.0.0.1:8080`.
+`make up` pulls the published Nemotron image and waits for it to be ready. Use
+LFM2.5 instead with:
+
+```bash
+make up MODEL=lfm25
+```
+
+The published images currently target Linux `amd64`. The OpenAI-compatible
+endpoint is bound only to `127.0.0.1:8080`.
 
 Check the model and both MCP connections:
 
 ```bash
 ./bin/reviewer doctor
 ```
+
+Pass the matching `REVIEWER_LLM_MODEL` value when invoking the CLI manually. The
+Make targets select it automatically.
 
 Write a review:
 
@@ -57,6 +68,13 @@ The report goes to stdout unless `--output` is supplied. Stop the model with:
 
 ```bash
 make down
+```
+
+To build a model image locally, download the selected model and build it:
+
+```bash
+make build-model MODEL=nemotron
+make build-model MODEL=lfm25
 ```
 
 ## What the review contains
@@ -128,7 +146,7 @@ URL fetching is restricted to Microsoft-owned domains and validates redirects.
 | Flag / variable | Default | Purpose |
 | --- | --- | --- |
 | `--llm-url` / `REVIEWER_LLM_URL` | `http://127.0.0.1:8080` | llama.cpp base URL |
-| `--model` / `REVIEWER_LLM_MODEL` | `gemma-3-4b-it` | llama-server model alias |
+| `--model` / `REVIEWER_LLM_MODEL` | `nemotron-3-nano-4b` | llama-server model alias |
 | `--mcp-config` / `REVIEWER_MCP_CONFIG` | built-in Microsoft servers | MCP JSON path |
 | `--timeout` / `REVIEWER_TIMEOUT` | `5m` | overall timeout |
 | `--max-tokens` / `REVIEWER_MAX_TOKENS` | `2048` | generated-token limit |
@@ -145,5 +163,6 @@ make verify
 ```
 
 This runs the Go tests and vet checks, validates Compose, and checks the model
-download script. Tests use in-process fake MCP and llama.cpp servers; the large
-model is not downloaded in CI.
+download script. Tests use in-process fake MCP and llama.cpp servers. The
+`Publish model images` workflow downloads and packages the large models
+separately.

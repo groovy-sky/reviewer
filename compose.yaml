@@ -1,12 +1,12 @@
 services:
-  gemma:
-    image: ${LLAMA_CPP_IMAGE:-ghcr.io/ggml-org/llama.cpp:server-b12627}
+  model:
+    image: ${REVIEWER_MODEL_IMAGE:-ghcr.io/groovy-sky/reviewer:nemotron-3-nano-4b}
     init: true
     command:
       - --model
-      - /models/${GEMMA_MODEL_FILENAME:-gemma-3-4b-it-Q4_K_M.gguf}
+      - /models/${REVIEWER_MODEL_FILENAME:-NVIDIA-Nemotron3-Nano-4B-Q4_K_M.gguf}
       - --alias
-      - ${GEMMA_MODEL_NAME:-gemma-3-4b-it}
+      - ${REVIEWER_MODEL_NAME:-nemotron-3-nano-4b}
       - --host
       - 0.0.0.0
       - --port
@@ -15,8 +15,6 @@ services:
       - ${LLAMA_CTX_SIZE:-16384}
     ports:
       - 127.0.0.1:${LLAMA_HOST_PORT:-8080}:8080
-    volumes:
-      - ${REVIEWER_MODEL_DIR:-./models}:/models:ro
     healthcheck:
       test: ["CMD-SHELL", "curl --fail --silent http://127.0.0.1:8080/health >/dev/null"]
       interval: 5s

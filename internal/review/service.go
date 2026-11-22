@@ -129,7 +129,7 @@ func buildPrompt(document update.Document, evidence []research.Evidence) string 
 
 func appendEvidenceManifest(report *strings.Builder, originalURL string, evidence []research.Evidence) {
 	report.WriteString("## Evidence consulted\n")
-	report.WriteString("The review was generated locally by Gemma and grounded in the following MCP results. MCP content is treated as untrusted source material.\n\n")
+	report.WriteString("The review was generated locally by the configured model and grounded in the following MCP results. MCP content is treated as untrusted source material.\n\n")
 	if originalURL != "" {
 		report.WriteString("- **Input URL:** ")
 		report.WriteString(originalURL)

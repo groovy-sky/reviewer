@@ -1,21 +1,35 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+model="${REVIEWER_MODEL:-nemotron}"
 model_dir="${REVIEWER_MODEL_DIR:-models}"
-model_repo="${GEMMA_MODEL_REPO:-ggml-org/gemma-3-4b-it-GGUF}"
-model_revision="${GEMMA_MODEL_REVISION:-ab31416aceb30cd095cb34cc27eea120940964e4}"
-model_file="${GEMMA_MODEL_FILENAME:-gemma-3-4b-it-Q4_K_M.gguf}"
-model_sha256="${GEMMA_MODEL_SHA256:-882e8d2db44dc554fb0ea5077cb7e4bc49e7342a1f0da57901c0802ea21a0863}"
+
+case "${model}" in
+  nemotron)
+    model_repo="nvidia/NVIDIA-Nemotron-3-Nano-4B-GGUF"
+    model_file="NVIDIA-Nemotron3-Nano-4B-Q4_K_M.gguf"
+    ;;
+  lfm25)
+    model_repo="LiquidAI/LFM2.5-2.6B-GGUF"
+    model_file="LFM2.5-2.6B-Q8_0.gguf"
+    ;;
+  *)
+    printf 'REVIEWER_MODEL must be nemotron or lfm25\n' >&2
+    exit 1
+    ;;
+esac
+
+revision="${REVIEWER_MODEL_REVISION:-main}"
+model_file="${REVIEWER_MODEL_FILENAME:-${model_file}}"
+model_sha256="${REVIEWER_MODEL_SHA256:-}"
 target="${model_dir}/${model_file}"
 partial="${target}.part"
 
 mkdir -p "${model_dir}"
 
-if [[ -f "${target}" ]]; then
-  printf 'Model already exists at %s\n' "${target}"
-else
-  url="${GEMMA_MODEL_URL:-https://huggingface.co/${model_repo}/resolve/${model_revision}/${model_file}?download=true}"
-  printf 'Downloading %s (about 2.49 GB)...\n' "${model_file}"
+if [[ ! -f "${target}" ]]; then
+  url="${REVIEWER_MODEL_URL:-https://huggingface.co/${model_repo}/resolve/${revision}/${model_file}?download=true}"
+  printf 'Downloading %s from %s...\n' "${model_file}" "${model_repo}"
   curl_args=(
     --fail
     --location
@@ -48,4 +62,4 @@ if [[ -n "${model_sha256}" ]]; then
   fi
 fi
 
-printf 'Verified model: %s\n' "${target}"
+printf 'Model ready: %s\n' "${target}"
