@@ -13,17 +13,10 @@ services:
       - "8080"
       - --ctx-size
       - ${LLAMA_CTX_SIZE:-16384}
-    environment:
-      LLAMA_ARG_N_GPU_LAYERS: ${LLAMA_GPU_LAYERS:-0}
     ports:
       - 127.0.0.1:${LLAMA_HOST_PORT:-8080}:8080
     volumes:
-      - type: bind
-        source: ${REVIEWER_MODEL_DIR:-./models}
-        target: /models
-        read_only: true
-        bind:
-          create_host_path: false
+      - ${REVIEWER_MODEL_DIR:-./models}:/models:ro
     healthcheck:
       test: ["CMD-SHELL", "curl --fail --silent http://127.0.0.1:8080/health >/dev/null"]
       interval: 5s

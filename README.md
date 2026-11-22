@@ -4,7 +4,7 @@
 `reviewer` is a Go CLI that writes evidence-grounded Markdown reviews of Microsoft
 updates. It combines:
 
-- the local Gemma 3 4B instruct model served by llama.cpp;
+- the local Gemma 3 4B instruct model served by the official llama.cpp Docker image;
 - Microsoft's remote Streamable HTTP MCP servers for Learn documentation and
   Release Communications;
 - a bounded source-gathering workflow that feeds evidence to Gemma without
@@ -15,7 +15,7 @@ update text, a file, or stdin.
 
 ## Requirements
 
-- Docker with Docker Compose, or a native `llama-server`
+- Docker with Docker Compose
 - Go 1.24 or newer
 - about 2.49 GB of free space for the quantized Gemma model
 - internet access to Hugging Face and the configured Microsoft MCP endpoints
@@ -31,11 +31,12 @@ make build
 make up
 ```
 
-`make up` prepares the checksummed `gemma-3-4b-it-Q4_K_M.gguf` model, then starts
-the pinned CPU image and waits for llama.cpp to be ready. The image supports
-Linux `amd64` and `arm64` without emulation. The model stays on disk and is
-mounted read-only. The host CLI uses the OpenAI-compatible endpoint on
-`127.0.0.1:8080`, so successive reviews can reuse the same running server.
+`make up` downloads the checksummed
+`gemma-3-4b-it-Q4_K_M.gguf` model, then starts the pinned multi-platform
+llama.cpp image and waits for it to be ready. The image runs natively on Linux
+`amd64`, `arm64`, and `s390x`; Docker resolves the matching variant
+automatically. The OpenAI-compatible endpoint is bound only to
+`127.0.0.1:8080`.
 
 Check the model and both MCP connections:
 
@@ -56,25 +57,6 @@ The report goes to stdout unless `--output` is supplied. Stop the model with:
 
 ```bash
 make down
-```
-
-### Hardware acceleration
-
-On Linux with an NVIDIA GPU, install a compatible driver and configure the
-[NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html),
-then use `make up-cuda` instead of `make up`. This selects the pinned CUDA
-image, requests one NVIDIA GPU, and lets llama.cpp automatically choose how
-many layers to offload. Set `LLAMA_CUDA_GPU_LAYERS` to override that choice.
-`make down` works for either mode.
-
-On Apple Silicon, run `llama-server` natively to use Metal. Docker Desktop's
-Linux container cannot use Metal, even with an `arm64` image. With a native
-llama.cpp install, reuse the same weights and CLI settings:
-
-```bash
-make model
-llama-server --model models/gemma-3-4b-it-Q4_K_M.gguf --alias gemma-3-4b-it \
-  --host 127.0.0.1 --port 8080 --ctx-size 16384 --n-gpu-layers auto
 ```
 
 ## What the review contains
@@ -154,15 +136,7 @@ URL fetching is restricted to Microsoft-owned domains and validates redirects.
 | `--max-evidence` | `6` | maximum evidence blocks in the prompt |
 | `REVIEWER_LLM_API_KEY` | unset | optional Bearer token |
 
-Copy `.env.example` to `.env` for Compose-only server settings. Remove any
-old `LLAMA_CPP_IMAGE` override to use the current default CPU image. If you
-change the port or alias, set the matching CLI flag or export the matching
-`REVIEWER_LLM_*` variable; the CLI does not read `.env`.
-
-Export model file overrides such as `REVIEWER_MODEL_DIR` and
-`GEMMA_MODEL_FILENAME` in the shell before running `make up` or `make up-cuda`
-so both the host downloader and Compose see them. When choosing different
-weights, supply the matching model revision and `GEMMA_MODEL_SHA256`.
+Copy `.env.example` to `.env` to customize Docker Compose.
 
 ## Verification
 
@@ -170,6 +144,6 @@ weights, supply the matching model revision and `GEMMA_MODEL_SHA256`.
 make verify
 ```
 
-This runs the Go tests and vet checks, validates both Compose modes, and checks
-the model download script. Tests use in-process fake MCP and llama.cpp servers;
-the large model is not downloaded in CI.
+This runs the Go tests and vet checks, validates Compose, and checks the model
+download script. Tests use in-process fake MCP and llama.cpp servers; the large
+model is not downloaded in CI.
