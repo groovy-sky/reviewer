@@ -1,0 +1,7 @@
+bin/
+models/
+*.gguf
+.reviewer/
+.env
+.env.local
+mcp.json
