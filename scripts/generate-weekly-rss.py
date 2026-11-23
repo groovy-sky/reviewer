@@ -257,14 +257,35 @@ def introduction_source(
         )
         for update in updates
     ]
+    if any(not title or not summary for title, summary in records):
+        raise RuntimeError(
+            "every introduction update must have a title and completed summary"
+        )
 
     def document(record_limit: int) -> str:
         compact_records = []
         for title, summary in records:
-            text = title
-            if summary:
-                text = f"{text}: {summary}"
-            compact_records.append(text[:record_limit])
+            separator = ": "
+            content_limit = record_limit - len(separator)
+            if content_limit < 2:
+                compact_records.append("")
+                continue
+            title_limit = max(1, (content_limit * 3) // 5)
+            summary_limit = content_limit - title_limit
+
+            compact_title = title[:title_limit]
+            compact_summary = summary[:summary_limit]
+            if len(compact_title) < title_limit:
+                compact_summary = summary[
+                    : summary_limit + title_limit - len(compact_title)
+                ]
+            elif len(compact_summary) < summary_limit:
+                compact_title = title[
+                    : title_limit + summary_limit - len(compact_summary)
+                ]
+            compact_records.append(
+                f"{compact_title}{separator}{compact_summary}"
+            )
         return json.dumps(
             {"feed": feed_name, "week": week, "updates": compact_records},
             ensure_ascii=False,
@@ -278,7 +299,7 @@ def introduction_source(
             f"--max-source-chars={max_source_chars}"
         )
 
-    low, high = 1, max_source_chars
+    low, high = 4, max_source_chars
     while low <= high:
         candidate_limit = (low + high) // 2
         candidate = document(candidate_limit)
@@ -287,9 +308,11 @@ def introduction_source(
             low = candidate_limit + 1
         else:
             high = candidate_limit - 1
-    if not all(json.loads(best)["updates"]):
+    compact_records = json.loads(best)["updates"]
+    if not all(": " in record for record in compact_records):
         raise RuntimeError(
-            "not enough introduction source space to represent every update"
+            "not enough introduction source space to represent every update "
+            "with a title and summary"
         )
     return best
 

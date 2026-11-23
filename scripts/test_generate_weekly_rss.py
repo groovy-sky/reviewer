@@ -399,6 +399,34 @@ class WeeklyRSSGeneratorTest(unittest.TestCase):
         for position, record in enumerate(document["updates"]):
             self.assertTrue(record.startswith(f"Update title {position}"))
 
+    def test_introduction_source_preserves_summaries_after_long_titles(
+        self,
+    ) -> None:
+        updates = [
+            generator.SummarizedAnnouncement(
+                generator.Announcement(
+                    entry_key=str(position),
+                    title=f"Long title {position:03d} " + ("x" * 100),
+                    url=f"https://example.com/{position}",
+                    published_at=position,
+                    source_text="Source.",
+                ),
+                f"Summary for update {position} includes a retirement caveat.",
+            )
+            for position in range(180)
+        ]
+
+        source = generator.introduction_source(
+            "Microsoft Azure Updates", "2026-W47", updates, 16_000
+        )
+        records = json.loads(source)["updates"]
+
+        self.assertLessEqual(len(source), 16_000)
+        self.assertEqual(len(records), 180)
+        for position, record in enumerate(records):
+            self.assertTrue(record.startswith(f"Long title {position:03d}"))
+            self.assertIn(": Summary for update ", record)
+
 
 if __name__ == "__main__":
     unittest.main()
