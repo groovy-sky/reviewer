@@ -57,8 +57,8 @@ func TestGenerateGroundsAndLabelsReport(t *testing.T) {
 	if !strings.Contains(report, "https://learn.microsoft.com/azure/update-467931") {
 		t.Fatalf("evidence link missing: %s", report)
 	}
-	if !strings.Contains(completer.system, "untrusted data") {
-		t.Fatalf("system prompt does not define MCP trust boundary: %s", completer.system)
+	if !strings.Contains(completer.system, "Keep every announcement as a separate item in its original order") {
+		t.Fatalf("system prompt does not preserve announcement order: %s", completer.system)
 	}
 	if !strings.Contains(completer.user, "### [S1]") {
 		t.Fatalf("evidence was not labeled for the model: %s", completer.user)
