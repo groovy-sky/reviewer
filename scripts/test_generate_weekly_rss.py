@@ -117,6 +117,12 @@ class WeeklyRSSGeneratorTest(unittest.TestCase):
         self.assertEqual(announcements[0].source_text, "Complete provider content.")
         self.assertTrue((current / "index.json").is_file())
 
+    def test_rejects_an_iso_week_that_does_not_exist_in_the_year(self) -> None:
+        with self.assertRaisesRegex(
+            generator.InputError, "--week is not a valid ISO week"
+        ):
+            generator.parse_week("2021-W53")
+
     def test_ignores_an_enrichment_for_a_stale_revision(self) -> None:
         entry = self.add_entry(
             "stale",

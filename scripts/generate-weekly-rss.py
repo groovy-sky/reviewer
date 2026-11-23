@@ -55,9 +55,11 @@ def parse_week(value: str) -> tuple[int, int]:
         raise InputError("--week must use the ISO format YYYY-Www")
     year, week = int(match.group(1)), int(match.group(2))
     try:
-        dt.date.fromisocalendar(year, week, 1)
+        monday = dt.date.fromisocalendar(year, week, 1)
     except ValueError as error:
         raise InputError(f"--week is not a valid ISO week: {value}") from error
+    if monday.isocalendar()[:2] != (year, week):
+        raise InputError(f"--week is not a valid ISO week: {value}")
     return year, week
 
 

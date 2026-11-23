@@ -184,5 +184,6 @@ Nemotron model using the neutral-source prompt in
 `scripts/generate-weekly-rss.py`. The workflow writes one
 `weekly/<YYYY-Www>.md` report to the `reviewer` branch with the same name as the
 corresponding source archive branch, preserving reports from earlier weeks.
-The workflow can also be started manually; manual runs still target the current
-UTC ISO week.
+The workflow can also be started manually with an optional `week_number` from 1
+to 53 and `iso_year`. Omitted values default to the current UTC ISO week and
+year.
