@@ -169,7 +169,7 @@ class WeeklyRSSGeneratorTest(unittest.TestCase):
 
         self.assertEqual(announcements, [])
 
-    def test_renders_one_markdown_item_per_announcement(self) -> None:
+    def test_renders_all_summaries_before_the_introduction(self) -> None:
         announcement = generator.Announcement(
             entry_key="entry",
             title="A [new] capability",
@@ -177,23 +177,80 @@ class WeeklyRSSGeneratorTest(unittest.TestCase):
             published_at=1,
             source_text="Supported source text.",
         )
-        seen: list[generator.Announcement] = []
+        second = generator.Announcement(
+            entry_key="second",
+            title="Another capability",
+            url="https://example.com/update?id=43",
+            published_at=2,
+            source_text="More supported source text.",
+        )
+        events = []
 
         def summarize(value: generator.Announcement) -> str:
-            seen.append(value)
-            return "It provides a monitored capability."
+            events.append(("summary", value.entry_key))
+            return f"Summary for {value.entry_key}."
+
+        def introduce(
+            feed_name: str,
+            week: str,
+            updates: list[generator.SummarizedAnnouncement],
+        ) -> str:
+            events.append(
+                (
+                    "introduction",
+                    [update.announcement.entry_key for update in updates],
+                )
+            )
+            self.assertEqual(feed_name, "Microsoft Azure Updates")
+            self.assertEqual(week, "2026-W47")
+            return "AI and infrastructure feature prominently in this week's updates."
 
         report = generator.render_report(
-            "microsoft-azure-updates", "2026-W47", [announcement], summarize
+            "microsoft-azure-updates",
+            "2026-W47",
+            [announcement, second],
+            summarize,
+            introduce,
         )
 
-        self.assertEqual(seen, [announcement])
+        self.assertEqual(
+            events,
+            [
+                ("summary", "entry"),
+                ("summary", "second"),
+                ("introduction", ["entry", "second"]),
+            ],
+        )
         self.assertIn(
             "* [A \\[new\\] capability](https://example.com/update?id=42). - "
-            "It provides a monitored capability.",
+            "Summary for entry.",
             report,
         )
-        self.assertTrue(report.startswith("This week featured 1 update"))
+        self.assertTrue(report.startswith("This week featured 2 updates"))
+        self.assertLess(
+            report.index("AI and infrastructure feature"),
+            report.index("Detailed list:"),
+        )
+
+    def test_empty_report_does_not_request_an_introduction(self) -> None:
+        introduce = mock.Mock(
+            side_effect=AssertionError("introduction should not be requested")
+        )
+
+        report = generator.render_report(
+            "microsoft-azure-updates",
+            "2026-W47",
+            [],
+            mock.Mock(side_effect=AssertionError("summary should not be requested")),
+            introduce,
+        )
+
+        self.assertEqual(
+            report,
+            "No updates were published for Microsoft Azure Updates "
+            "during ISO week 2026-W47.\n",
+        )
+        introduce.assert_not_called()
 
     def test_sends_the_required_prompt_to_the_model(self) -> None:
         announcement = generator.Announcement(
@@ -248,6 +305,99 @@ class WeeklyRSSGeneratorTest(unittest.TestCase):
             captured["payload"]["chat_template_kwargs"],
             {"enable_thinking": False},
         )
+
+    def test_sends_every_completed_summary_to_the_introduction_prompt(self) -> None:
+        captured = {}
+        updates = [
+            generator.SummarizedAnnouncement(
+                generator.Announcement(
+                    entry_key="first",
+                    title="Azure AI capability",
+                    url="https://example.com/first",
+                    published_at=1,
+                    source_text="First source.",
+                ),
+                "A new AI capability.",
+            ),
+            generator.SummarizedAnnouncement(
+                generator.Announcement(
+                    entry_key="second",
+                    title="Retirement notice",
+                    url="https://example.com/second",
+                    published_at=2,
+                    source_text="Second source.",
+                ),
+                "An affected service will retire.",
+            ),
+        ]
+
+        def respond(request: object, timeout: float) -> io.BytesIO:
+            captured["payload"] = json.loads(request.data)
+            return io.BytesIO(
+                b'{"choices":[{"message":{"content":'
+                b'"AI updates dominate, alongside a retirement notice."}}]}'
+            )
+
+        summarizer = generator.LLMSummarizer(
+            base_url="http://127.0.0.1:8080",
+            model="nemotron-3-nano-4b",
+            api_key="",
+            temperature=0.15,
+            max_tokens=240,
+            max_source_chars=16_000,
+            timeout=300,
+        )
+        with mock.patch.object(
+            generator.urllib.request, "urlopen", side_effect=respond
+        ):
+            introduction = summarizer.introduce(
+                "Microsoft Azure Updates", "2026-W47", updates
+            )
+
+        self.assertEqual(
+            introduction, "AI updates dominate, alongside a retirement notice."
+        )
+        self.assertEqual(
+            captured["payload"]["messages"][0]["content"],
+            generator.INTRODUCTION_PROMPT,
+        )
+        source = captured["payload"]["messages"][1]["content"].split(
+            "<source>", 1
+        )[1].split("</source>", 1)[0]
+        document = json.loads(source)
+        self.assertEqual(len(document["updates"]), 2)
+        self.assertIn("Azure AI capability: A new AI capability.", document["updates"])
+        self.assertIn(
+            "Retirement notice: An affected service will retire.",
+            document["updates"],
+        )
+
+    def test_introduction_source_stays_bounded_and_represents_every_update(
+        self,
+    ) -> None:
+        updates = [
+            generator.SummarizedAnnouncement(
+                generator.Announcement(
+                    entry_key=str(position),
+                    title=f"Update title {position}",
+                    url=f"https://example.com/{position}",
+                    published_at=position,
+                    source_text="Source.",
+                ),
+                f"Long summary {position} " * 20,
+            )
+            for position in range(5)
+        ]
+
+        source = generator.introduction_source(
+            "Microsoft Azure Updates", "2026-W47", updates, 220
+        )
+        document = json.loads(source)
+
+        self.assertLessEqual(len(source), 220)
+        self.assertEqual(len(document["updates"]), 5)
+        for position, record in enumerate(document["updates"]):
+            self.assertTrue(record.startswith(f"Update title {position}"))
 
 
 if __name__ == "__main__":

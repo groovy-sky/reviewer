@@ -181,7 +181,11 @@ enrichments take precedence over source-truncated feed text.
 
 Each selected announcement is summarized independently by the published
 Nemotron model using the neutral-source prompt in
-`scripts/generate-weekly-rss.py`. The workflow writes one
+`scripts/generate-weekly-rss.py`. After every item is covered, a second model
+pass uses all completed titles and summaries to write a neutral two- or
+three-sentence introduction before the detailed list. The aggregate input is
+compacted as needed so every selected update remains represented within the
+configured source limit. The workflow writes one
 `weekly/<YYYY-Www>.md` report to the `reviewer` branch with the same name as the
 corresponding source archive branch, preserving reports from earlier weeks.
 The workflow can also be started manually with an optional `week_number` from 1
