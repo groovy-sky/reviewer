@@ -359,7 +359,7 @@ def render_report(
         announcement = update.announcement
         lines.append(
             f"* [{markdown_text(announcement.title)}]"
-            f"({markdown_url(announcement.url)}). - {markdown_text(update.summary)}"
+            f"({markdown_url(announcement.url)}). {markdown_text(update.summary)}"
         )
     return "\n".join(lines) + "\n"
 

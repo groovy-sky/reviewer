@@ -222,10 +222,11 @@ class WeeklyRSSGeneratorTest(unittest.TestCase):
             ],
         )
         self.assertIn(
-            "* [A \\[new\\] capability](https://example.com/update?id=42). - "
+            "* [A \\[new\\] capability](https://example.com/update?id=42). "
             "Summary for entry.",
             report,
         )
+        self.assertNotIn("). - ", report)
         self.assertTrue(report.startswith("This week featured 2 updates"))
         self.assertLess(
             report.index("AI and infrastructure feature"),
