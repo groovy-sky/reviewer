@@ -35,6 +35,10 @@ jobs:
         with:
           ref: main
           fetch-depth: 0
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
 
       - name: Get ISO week
         id: week
@@ -50,27 +54,21 @@ jobs:
           else
             selected_year="${ISO_YEAR:-$(date -u +%G)}"
             selected_week="${WEEK_NUMBER:-$(date -u +%V)}"
-            week="$(
-              python3 - "$selected_year" "$selected_week" <<'PY'
-          import datetime as dt
-          import re
-          import sys
-
-          year_text, week_text = sys.argv[1:]
-          if re.fullmatch(r"\d{4}", year_text) is None:
-              raise SystemExit("iso_year must be a four-digit year")
-          if re.fullmatch(r"\d{1,2}", week_text) is None:
-              raise SystemExit("week_number must be a number from 1 to 53")
-          year, week = int(year_text), int(week_text)
-          try:
-              monday = dt.date.fromisocalendar(year, week, 1)
-          except ValueError:
-              raise SystemExit(f"{year}-W{week:02d} is not a valid ISO week")
-          if monday.isocalendar()[:2] != (year, week):
-              raise SystemExit(f"{year}-W{week:02d} is not a valid ISO week")
-          print(f"{year}-W{week:02d}")
-          PY
-            )"
+            if [[ ! "$selected_year" =~ ^[0-9]{4}$ ]]; then
+              echo "iso_year must be a four-digit year" >&2
+              exit 1
+            fi
+            if [[ ! "$selected_week" =~ ^[0-9]{1,2}$ ]] ||
+              (( 10#$selected_week < 1 || 10#$selected_week > 53 )); then
+              echo "week_number must be a number from 1 to 53" >&2
+              exit 1
+            fi
+            printf -v week '%s-W%02d' "$selected_year" "$((10#$selected_week))"
+            normalized_week="$(date -u -d "${week}-1" +%G-W%V 2>/dev/null || true)"
+            if [[ "$normalized_week" != "$week" ]]; then
+              echo "$week is not a valid ISO week" >&2
+              exit 1
+            fi
           fi
           echo "value=$week" >> "$GITHUB_OUTPUT"
           echo "Generating ISO week $week."
@@ -130,6 +128,8 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           report_root="$RUNNER_TEMP/weekly-rss-reports"
           mkdir -p "$report_root"
+          generator="$RUNNER_TEMP/generate-weekly-rss"
+          go build -trimpath -o "$generator" ./cmd/generate-weekly-rss
 
           mapfile -t source_refs < <(
             git -C "$RSS_SOURCE" for-each-ref \
@@ -156,7 +156,7 @@ jobs:
             echo "Processing $branch."
             git -C "$RSS_SOURCE" worktree add --quiet --detach \
               "$source_worktree" "$source_ref"
-            python3 scripts/generate-weekly-rss.py \
+            "$generator" \
               --source-directory "$source_worktree" \
               --week "$WEEK" \
               --output "$report"

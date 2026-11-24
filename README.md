@@ -180,8 +180,8 @@ a numeric `published_at` epoch timestamp in that week. Matching provider
 enrichments take precedence over source-truncated feed text.
 
 Each selected announcement is summarized independently by the published
-Nemotron model using the neutral-source prompt in
-`scripts/generate-weekly-rss.py`. After every item is covered, a second model
+Nemotron model using the neutral-source prompt in the Go
+`generate-weekly-rss` command. After every item is covered, a second model
 pass uses all completed titles and summaries to write a neutral two- or
 three-sentence introduction before the detailed list. The aggregate input is
 compacted as needed so every selected update remains represented within the
@@ -191,3 +191,6 @@ corresponding source archive branch, preserving reports from earlier weeks.
 The workflow can also be started manually with an optional `week_number` from 1
 to 53 and `iso_year`. Omitted values default to the current UTC ISO week and
 year.
+
+Both automation utilities are native Go commands and can be run locally with
+`go run ./cmd/generate-weekly-rss` and `go run ./cmd/test-model`.

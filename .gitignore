@@ -5,5 +5,3 @@ models/
 .env
 .env.local
 mcp.json
-__pycache__/
-*.py[cod]

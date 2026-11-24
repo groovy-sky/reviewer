@@ -7,6 +7,8 @@ on:
     paths:
       - Dockerfile.model
       - scripts/download-model.sh
+      - cmd/test-model/**
+      - internal/modeltest/**
       - .github/workflows/publish-models.yml
 
 permissions:
@@ -30,6 +32,10 @@ jobs:
             filename: LFM2.5-2.6B-Q8_0.gguf
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
       - name: Download model
         env:
           REVIEWER_MODEL: ${{ matrix.model }}
@@ -77,7 +83,7 @@ jobs:
           exit 1
       - name: Generate article responses
         run: |
-          python3 scripts/test-model.py \
+          go run ./cmd/test-model \
             --model "${{ matrix.alias }}" \
             --article testdata/copilot-harness-article.txt \
             --output "results/${{ matrix.model }}.md"
