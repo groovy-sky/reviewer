@@ -63,12 +63,13 @@ jobs:
               echo "week_number must be a number from 1 to 53" >&2
               exit 1
             fi
-            printf -v week '%s-W%02d' "$selected_year" "$((10#$selected_week))"
-            normalized_week="$(date -u -d "${week}-1" +%G-W%V 2>/dev/null || true)"
-            if [[ "$normalized_week" != "$week" ]]; then
-              echo "$week is not a valid ISO week" >&2
+            # December 28 always falls in the last ISO week of its year.
+            max_week="$(date -u -d "${selected_year}-12-28" +%V)"
+            if (( 10#$selected_week > 10#$max_week )); then
+              echo "$selected_year only has $max_week ISO weeks" >&2
               exit 1
             fi
+            printf -v week '%s-W%02d' "$selected_year" "$((10#$selected_week))"
           fi
           echo "value=$week" >> "$GITHUB_OUTPUT"
           echo "Generating ISO week $week."
