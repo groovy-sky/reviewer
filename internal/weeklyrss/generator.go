@@ -21,11 +21,27 @@ import (
 )
 
 const (
-	SummaryPrompt = "Write a concise, neutral summary of the supplied announcement, focusing on " +
-		"what was announced, who it serves, and its practical significance. Use only " +
-		"information supported by the source, distinguish vendor claims from verified " +
-		"facts, and avoid promotional language or unsupported assumptions about " +
-		"pricing, performance, cost savings, or ease of use."
+	SummaryPrompt = `Write a concise, neutral summary of the supplied announcement.
+
+Keep the summary to 75 words or fewer, using fewer for simple announcements and more only when essential qualifications would otherwise be lost. Return only the summary.
+
+Preserve:
+- What was announced or changed and its defining capability.
+- Release status, unless already stated in a separately displayed title.
+- Scope, prerequisites, exclusions, deadlines, or limitations that materially affect adoption or interpretation.
+- Intended audience and practical significance only when explicitly supported and informative.
+
+Compress:
+- Do not repeat information already stated in a separately displayed title.
+- Remove introductory filler, promotional language, generic benefits, repeated explanations, and unnecessary background.
+- Replace exhaustive feature, use-case, tool, and interface lists with accurate categories when individual details are not essential.
+- Keep numbers only when they define a key capability, material limit, deadline, or important qualification.
+
+Use only the supplied source. Do not imply independent verification. Attribute retained vendor claims about performance, savings, usability, or compliance; omit them if they are not central to the announcement.
+
+Do not infer missing information or strengthen claims. Preserve distinctions such as preview versus general availability, best-effort versus guaranteed, and customer-initiated versus automatic. Briefly flag material contradictions in the supplied source rather than silently resolving them.
+
+Accuracy and preservation of the main idea take precedence over the word target.`
 
 	IntroductionPrompt = "Write a concise, neutral introduction of two or three sentences for a weekly " +
 		"update digest after reviewing the supplied update titles and summaries. " +
