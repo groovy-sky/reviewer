@@ -21,33 +21,33 @@ import (
 )
 
 const (
-	SummaryPrompt = `Write a concise, neutral summary of the supplied announcement.
+	SummaryPrompt = `Summarize the supplied announcement in concise, neutral prose. Return only the summary.
 
-Keep the summary to 75 words or fewer, using fewer for simple announcements and more only when essential qualifications would otherwise be lost. Return only the summary.
+Use only the supplied text. Do not infer facts, strengthen claims, or imply independent verification.
 
-Preserve:
-- What was announced or changed and its defining capability.
-- Release status, unless already stated in a separately displayed title.
+Include:
+- The main change and its defining capability.
 - Scope, prerequisites, exclusions, deadlines, or limitations that materially affect adoption or interpretation.
-- Intended audience and practical significance only when explicitly supported and informative.
+- Release status unless already explicit in the displayed title.
 
-Compress:
-- Do not repeat information already stated in a separately displayed title.
-- Remove introductory filler, promotional language, generic benefits, repeated explanations, and unnecessary background.
-- Replace exhaustive feature, use-case, tool, and interface lists with accurate categories when individual details are not essential.
-- Keep numbers only when they define a key capability, material limit, deadline, or important qualification.
+Omit:
+- Facts already explicit in the displayed title, unless needed for clarity.
+- Secondary features, examples, background, and numbers unless essential to understanding the change or its limits.
+- Promotional language, generic benefits, filler, and repetition.
 
-Use only the supplied source. Do not imply independent verification. Attribute retained vendor claims about performance, savings, usability, or compliance; omit them if they are not central to the announcement.
+Group related secondary features into a precise category when useful; otherwise leave them out. Do not reproduce feature lists.
 
-Do not infer missing information or strengthen claims. Preserve distinctions such as preview versus general availability, best-effort versus guaranteed, and customer-initiated versus automatic. Briefly flag material contradictions in the supplied source rather than silently resolving them.
+Preserve distinctions such as preview versus general availability, best-effort versus guaranteed, and optional versus automatic. Attribute central vendor claims about performance, savings, usability, or compliance; otherwise omit them. Briefly flag material contradictions rather than resolving them.
 
-Accuracy and preservation of the main idea take precedence over the word target.`
+Use direct wording and readable sentences. Stop once the main change and essential qualifications are covered.`
 
-	IntroductionPrompt = "Write a concise, neutral introduction of two or three sentences for a weekly " +
-		"update digest after reviewing the supplied update titles and summaries. " +
-		"Synthesize the main recurring themes, breadth, and notable exceptions or " +
-		"caveats. Do not enumerate individual updates or include URLs, and do not add " +
-		"claims that are absent from the supplied material."
+	IntroductionPrompt = `Write a concise, neutral introduction for the supplied weekly update digest. Return only the introduction.
+
+Describe the main recurring themes, or the breadth if there is no common theme. Mention the release-status mix or shared limitations only when important to understanding the digest.
+
+Use only the supplied titles and summaries. Do not list individual updates, name features as examples, infer benefits or maturity, include URLs, or repeat an already displayed count or source heading.
+
+Omit minor themes, isolated details, promotional language, and generic conclusions. Do not force a unifying narrative or caveat. Stop once the useful overview is complete.`
 
 	maxResponseBytes = 4 << 20
 )
