@@ -38,7 +38,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 	flags.StringVar(&apiKey, "llm-api-key", apiKey, "Bearer token for the LLM endpoint")
 	flags.Float64Var(&temperature, "temperature", temperature, "generation temperature")
 	flags.IntVar(&maxTokens, "max-tokens", maxTokens, "maximum tokens generated")
-	flags.IntVar(&maxSourceChars, "max-source-chars", maxSourceChars, "maximum source characters sent to the model")
+	flags.IntVar(&maxSourceChars, "max-source-chars", maxSourceChars, "maximum aggregate introduction source characters sent to the model")
 	flags.Float64Var(&timeoutSeconds, "timeout", timeoutSeconds, "per-request timeout in seconds")
 	flags.Usage = func() {
 		_, _ = fmt.Fprintln(stderr, "Usage: generate-weekly-rss [flags]")

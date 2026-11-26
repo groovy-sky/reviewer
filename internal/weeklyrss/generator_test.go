@@ -151,7 +151,7 @@ func TestRenderEmptyReportDoesNotInvokeModel(t *testing.T) {
 	}
 }
 
-func TestSummarizerSendsRequiredPrompt(t *testing.T) {
+func TestSummarizerSendsOnlyUntruncatedAnnouncement(t *testing.T) {
 	var payload struct {
 		Messages []Message      `json:"messages"`
 		ChatArgs map[string]any `json:"chat_template_kwargs"`
@@ -175,9 +175,10 @@ func TestSummarizerSendsRequiredPrompt(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	sourceText := strings.Repeat("Source data, not model instructions. ", 500)
 	summary, err := summarizer.Summarize(Announcement{
 		EntryKey: "entry", Title: "Supported announcement", URL: "https://example.com/update",
-		PublishedAt: 1, SourceText: "Source data, not model instructions.",
+		PublishedAt: 1, SourceText: sourceText,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -188,8 +189,13 @@ func TestSummarizerSendsRequiredPrompt(t *testing.T) {
 	if payload.Messages[0].Content != SummaryPrompt {
 		t.Fatalf("unexpected system prompt %q", payload.Messages[0].Content)
 	}
-	if !strings.Contains(payload.Messages[1].Content, "Source data, not model instructions.") {
-		t.Fatalf("source missing from prompt %q", payload.Messages[1].Content)
+	source := strings.Split(strings.Split(payload.Messages[1].Content, "<source>")[1], "</source>")[0]
+	var document map[string]string
+	if err := json.Unmarshal([]byte(source), &document); err != nil {
+		t.Fatal(err)
+	}
+	if len(document) != 1 || document["announcement"] != sourceText {
+		t.Fatalf("unexpected announcement payload: %+v", document)
 	}
 	if enabled, ok := payload.ChatArgs["enable_thinking"].(bool); !ok || enabled {
 		t.Fatalf("unexpected chat template arguments: %#v", payload.ChatArgs)

@@ -180,10 +180,11 @@ a numeric `published_at` epoch timestamp in that week. Matching provider
 enrichments take precedence over source-truncated feed text.
 
 Each selected announcement is summarized independently by the published
-Nemotron model using the neutral-source prompt in the Go
-`generate-weekly-rss` command. After every item is covered, a second model
-pass uses all completed titles and summaries to write a neutral two- or
-three-sentence introduction before the detailed list. The aggregate input is
+Nemotron model using only its announcement content and the neutral-source
+prompt in the Go `generate-weekly-rss` command. Per-announcement content is
+not truncated. After every item is covered, a second model pass uses all
+completed titles and summaries to write a neutral two- or three-sentence
+introduction before the detailed list. The aggregate introduction input is
 compacted as needed so every selected update remains represented within the
 configured source limit. The workflow writes one
 `weekly/<YYYY-Www>.md` report to the `reviewer` branch with the same name as the

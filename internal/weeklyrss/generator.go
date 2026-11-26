@@ -28,10 +28,9 @@ Use only the supplied text. Do not infer facts, strengthen claims, or imply inde
 Include:
 - The main change and its defining capability.
 - Scope, prerequisites, exclusions, deadlines, or limitations that materially affect adoption or interpretation.
-- Release status unless already explicit in the displayed title.
+- Release status when stated in the announcement.
 
 Omit:
-- Facts already explicit in the displayed title, unless needed for clarity.
 - Secondary features, examples, background, and numbers unless essential to understanding the change or its limits.
 - Promotional language, generic benefits, filler, and repetition.
 
@@ -496,17 +495,8 @@ func NewLLMSummarizer(options SummarizerOptions) (*LLMSummarizer, error) {
 }
 
 func (s *LLMSummarizer) Summarize(announcement Announcement) (string, error) {
-	source := []rune(announcement.SourceText)
-	sourceText := announcement.SourceText
-	if len(source) > s.maxSourceChars {
-		sourceText = strings.TrimRightFunc(string(source[:s.maxSourceChars]), unicode.IsSpace) +
-			"\n[Source text truncated by the weekly report generator.]"
-	}
 	document, err := compactJSON(map[string]any{
-		"title":        announcement.Title,
-		"url":          announcement.URL,
-		"published_at": announcement.PublishedAt,
-		"announcement": sourceText,
+		"announcement": announcement.SourceText,
 	})
 	if err != nil {
 		return "", err
