@@ -23,30 +23,27 @@ import (
 const (
 	SummaryPrompt = `Summarize the supplied announcement in concise, neutral prose. Return only the summary.
 
-Use only the supplied text. Do not infer facts, strengthen claims, or imply independent verification.
+Focus on the main change and its defining capability: what changed and what it enables. Skip unimportant details.
 
-Include:
-- The main change and its defining capability.
-- Scope, prerequisites, exclusions, deadlines, or limitations that materially affect adoption or interpretation.
-- Release status when stated in the announcement.
+Include release status when stated. Retain prerequisites, scope, exclusions, deadlines, or limitations only when omitting them would materially misrepresent the change. Retain a version number when it identifies the release.
 
-Omit:
-- Secondary features, examples, background, and numbers unless essential to understanding the change or its limits.
-- Promotional language, generic benefits, filler, and repetition.
+If the announcement contains several equally important changes, group them into a few precise categories rather than reproducing a feature list.
 
-Group related secondary features into a precise category when useful; otherwise leave them out. Do not reproduce feature lists.
+Omit implementation details, configuration steps, secondary capabilities, optional integrations, examples, background, promotional language, generic benefits, and repetition.
 
-Preserve distinctions such as preview versus general availability, best-effort versus guaranteed, and optional versus automatic. Attribute central vendor claims about performance, savings, usability, or compliance; otherwise omit them. Briefly flag material contradictions rather than resolving them.
+Use only the supplied text. Do not infer facts, strengthen claims, or imply independent verification. Preserve distinctions such as preview versus general availability, optional versus automatic, and best-effort versus guaranteed. Attribute essential vendor claims about performance, savings, usability, or compliance; otherwise omit them. Briefly flag material contradictions rather than resolving them.
 
-Use direct wording and readable sentences. Stop once the main change and essential qualifications are covered.`
+Aim for one sentence up to 50 words. Add a second sentence only when needed to preserve an essential qualification. Use direct, readable wording. Stop once the main change is clear.`
 
 	IntroductionPrompt = `Write a concise, neutral introduction for the supplied weekly update digest. Return only the introduction.
 
-Describe the main recurring themes, or the breadth if there is no common theme. Mention the release-status mix or shared limitations only when important to understanding the digest.
+Highlight the main recurring themes, or the breadth of coverage if there is no common theme. Skip minor themes and isolated details.
 
 Use only the supplied titles and summaries. Do not list individual updates, name features as examples, infer benefits or maturity, include URLs, or repeat an already displayed count or source heading.
 
-Omit minor themes, isolated details, promotional language, and generic conclusions. Do not force a unifying narrative or caveat. Stop once the useful overview is complete.`
+Mention release status or shared limitations only when essential to understanding the digest. Omit promotional language and generic conclusions. Do not force a unifying narrative or caveat.
+
+Aim for one sentence of no more than 30 words. Stop once the useful overview is complete.`
 
 	maxResponseBytes = 4 << 20
 )
